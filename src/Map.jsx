@@ -158,35 +158,49 @@ const Map = () => {
           <GeoJSON 
             data={parkBoundaries} 
             style={parkStyle}
-            onEachFeature={(feature, layer) => {
-              const parkName = feature.properties.UNIT_NAME;
-              if (visitorCenters[parkName]) {
-                const marker = L.marker(visitorCenters[parkName], {
-                  icon: L.divIcon({
-                    className: 'custom-div-icon',
-                    html: `<div style="background-color: rgba(0,0,0,0.85); color: #FFD700; padding: 4px 8px; border-radius: 4px; border: 2px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.5);">${parkName.replace(' National Park', '')}</div>`,
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                  })
-                });
-                marker.bindPopup(`
-                  <div style="min-width: 200px">
-                    <h3 style="margin: 0 0 8px 0">${parkName}</h3>
-                    ${parkPeaks[parkName.replace(' National Park', '')] ? `
-                      <p style="margin: 4px 0">
-                        <strong>Highest Point:</strong> ${parkPeaks[parkName.replace(' National Park', '')][0]}<br />
-                        <strong>Elevation:</strong> ${parkPeaks[parkName.replace(' National Park', '')][1].toLocaleString()} ft
-                      </p>
-                    ` : ''}
-                    <small style="color: #666">Routes start/end at visitor center</small>
-                  </div>
-                `);
-                marker.on('click', () => handleParkClick({ name: parkName, location: visitorCenters[parkName] }));
-                layer.addLayer(marker);
-              }
-            }}
           />
         )}
+        {parkBoundaries && parkBoundaries.features.map((feature, i) => {
+          const parkName = feature.properties.UNIT_NAME;
+          const visitorLocation = visitorCenters[parkName];
+          if (!visitorLocation) return null;
+          const peakInfo = parkPeaks[parkName.replace(' National Park', '')];
+          const parkObj = { name: parkName, location: visitorLocation };
+          const isSelected = selectedParks.find(p => p.name === parkName);
+          return (
+            <Marker
+              key={parkName + '-visitor-center'}
+              position={visitorLocation}
+              eventHandlers={{
+                click: () => handleParkClick(parkObj)
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -10]} permanent>
+                <div style={getMarkerStyle(parkObj)}>
+                  {isSelected ? `${selectedParks.findIndex(p => p.name === parkName) + 1}. ` : ''}
+                  {parkName.replace(' National Park', '')}
+                  {peakInfo && (
+                    <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>
+                      {formatElevation(peakInfo[1])}
+                    </span>
+                  )}
+                </div>
+              </Tooltip>
+              <Popup>
+                <div style={{ minWidth: '200px' }}>
+                  <h3 style={{ margin: '0 0 8px 0' }}>{parkName}</h3>
+                  {peakInfo && (
+                    <p style={{ margin: '4px 0' }}>
+                      <strong>Highest Point:</strong> {peakInfo[0]}<br />
+                      <strong>Elevation:</strong> {peakInfo[1].toLocaleString()} ft ({Math.round(peakInfo[1] * 0.3048)}m)
+                    </p>
+                  )}
+                  <small style={{ color: '#666' }}>Routes start/end at visitor center</small>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
         {route && (
           <Polyline
             positions={route.map(([lng, lat]) => [lat, lng])}
