@@ -25,8 +25,8 @@ const Map = () => {
 
   useEffect(() => {
     // Fetch the GeoJSON data
-    fetch('/national_parks.geojson')
-      .then(response => response.json())
+    fetch('https://media.githubusercontent.com/media/NicolasKernick/National-Parks-Biking/main/public/national_parks.geojson')
+      .then((res) => res.json())
       .then(data => {
         setParkBoundaries(data);
       })
