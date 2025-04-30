@@ -28,7 +28,15 @@ const Map = () => {
     fetch('https://media.githubusercontent.com/media/NicolasKernick/National-Parks-Biking/main/public/national_parks.geojson')
       .then((res) => res.json())
       .then(data => {
-        setParkBoundaries(data);
+        // Filter for national parks
+        const nationalParks = {
+          ...data,
+          features: data.features.filter(feature => 
+            feature.properties.UNIT_TYPE === 'National Park' ||
+            feature.properties.UNIT_TYPE === 'National Park & Preserve'
+          )
+        };
+        setParkBoundaries(nationalParks);
       })
       .catch(error => {
         console.error('Error loading park boundaries:', error);
