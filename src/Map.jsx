@@ -6,6 +6,7 @@ import * as turf from '@turf/turf';
 import Openrouteservice from 'openrouteservice-js';
 import { visitorCenters } from './visitorCenters';
 import { parkPeaks } from './peakData';
+import L from 'leaflet';
 
 const usCenter = [39.8283, -98.5795];
 const orsClient = new Openrouteservice.Directions({
@@ -157,43 +158,35 @@ const Map = () => {
           <GeoJSON 
             data={parkBoundaries} 
             style={parkStyle}
+            onEachFeature={(feature, layer) => {
+              const parkName = feature.properties.UNIT_NAME;
+              if (visitorCenters[parkName]) {
+                const marker = L.marker(visitorCenters[parkName], {
+                  icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div style="background-color: rgba(0,0,0,0.85); color: #FFD700; padding: 4px 8px; border-radius: 4px; border: 2px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.5);">${parkName.replace(' National Park', '')}</div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                  })
+                });
+                marker.bindPopup(`
+                  <div style="min-width: 200px">
+                    <h3 style="margin: 0 0 8px 0">${parkName}</h3>
+                    ${parkPeaks[parkName.replace(' National Park', '')] ? `
+                      <p style="margin: 4px 0">
+                        <strong>Highest Point:</strong> ${parkPeaks[parkName.replace(' National Park', '')][0]}<br />
+                        <strong>Elevation:</strong> ${parkPeaks[parkName.replace(' National Park', '')][1].toLocaleString()} ft
+                      </p>
+                    ` : ''}
+                    <small style="color: #666">Routes start/end at visitor center</small>
+                  </div>
+                `);
+                marker.on('click', () => handleParkClick({ name: parkName, location: visitorCenters[parkName] }));
+                layer.addLayer(marker);
+              }
+            }}
           />
         )}
-        {selectedParks.map((park, i) => {
-          const peakInfo = parkPeaks[park.name] || parkPeaks[park.name.replace(' National Park', '')];
-          return (
-            <Marker 
-              key={park.name + '-visitor-center'} 
-              position={park.location}
-              eventHandlers={{
-                click: () => handleParkClick(park)
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -10]} permanent>
-                <div style={getMarkerStyle(park)}>
-                  {i + 1}. {park.name.replace(' National Park', '')}
-                  {peakInfo && (
-                    <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>
-                      {formatElevation(peakInfo[1])}
-                    </span>
-                  )}
-                </div>
-              </Tooltip>
-              <Popup>
-                <div style={{ minWidth: '200px' }}>
-                  <h3 style={{ margin: '0 0 8px 0' }}>{park.name}</h3>
-                  {peakInfo && (
-                    <p style={{ margin: '4px 0' }}>
-                      <strong>Highest Point:</strong> {peakInfo[0]}<br />
-                      <strong>Elevation:</strong> {peakInfo[1].toLocaleString()} ft ({Math.round(peakInfo[1] * 0.3048)}m)
-                    </p>
-                  )}
-                  <small style={{ color: '#666' }}>Routes start/end at visitor center</small>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
         {route && (
           <Polyline
             positions={route.map(([lng, lat]) => [lat, lng])}
