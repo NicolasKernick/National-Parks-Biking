@@ -6,7 +6,6 @@ import * as turf from '@turf/turf';
 import Openrouteservice from 'openrouteservice-js';
 import { visitorCenters } from './visitorCenters';
 import { parkPeaks } from './peakData';
-import nationalParksData from './national_parks.geojson';
 
 const usCenter = [39.8283, -98.5795];
 const orsClient = new Openrouteservice.Directions({
@@ -20,72 +19,26 @@ const formatElevation = (feet) => {
 
 const Map = () => {
   const [parkBoundaries, setParkBoundaries] = useState(null);
-  const [sortedParks, setSortedParks] = useState([]);
   const [selectedParks, setSelectedParks] = useState([]);
   const [route, setRoute] = useState(null);
-  const [routeInfo, setRouteInfo] = useState(null);
-  const [routeError, setRouteError] = useState(null);
+  const [routeStats, setRouteStats] = useState(null);
 
   useEffect(() => {
-    const data = nationalParksData;
-    const nationalParks = {
-      ...data,
-      features: data.features.filter(feature => 
-        feature.properties.UNIT_TYPE === 'National Park'
-      )
-    };
-    setParkBoundaries(nationalParks);
-
-    // Log all park names from GeoJSON for debugging
-    console.log('Park names from GeoJSON:', nationalParks.features.map(f => ({
-      name: f.properties.PARKNAME,
-      type: f.properties.UNIT_TYPE,
-      hasVisitorCenter: !!visitorCenters[f.properties.PARKNAME] || !!visitorCenters[f.properties.PARKNAME + ' National Park']
-    })));
-
-    // Create sorted parks array with visitor center coordinates
-    const parksWithLocations = nationalParks.features.map((feature, idx) => {
-      const parkName = feature.properties.PARKNAME;
-      let visitorCenter = visitorCenters[parkName];
-      let usedName = parkName;
-      if (!visitorCenter) {
-        visitorCenter = visitorCenters[parkName + ' National Park'];
-        usedName = parkName + ' National Park';
-      }
-      if (!visitorCenter) {
-        console.warn(`⚠️ No visitor center found for "${parkName}" or "${parkName} National Park". Available visitor centers:`, 
-          Object.keys(visitorCenters));
-      }
-
-      // If no visitor center data, fall back to centroid
-      let location;
-      if (visitorCenter) {
-        location = visitorCenter;
-        console.log(`✓ Found visitor center for ${usedName}`);
-      } else {
-        const centroid = turf.centroid(feature).geometry.coordinates;
-        location = [centroid[1], centroid[0]];
-        console.warn(`Using centroid for ${parkName} at [${location}]`);
-      }
-
-      return {
-        idx,
-        name: parkName,
-        location,
-        feature,
-        hasVisitorCenter: !!visitorCenter
-      };
-    });
-    
-    // Sort by latitude (north to south)
-    parksWithLocations.sort((a, b) => b.location[0] - a.location[0]);
-    setSortedParks(parksWithLocations);
+    // Fetch the GeoJSON data
+    fetch('/national_parks.geojson')
+      .then(response => response.json())
+      .then(data => {
+        setParkBoundaries(data);
+      })
+      .catch(error => {
+        console.error('Error loading park boundaries:', error);
+      });
   }, []);
 
   useEffect(() => {
     if (selectedParks.length === 2) {
       const [start, end] = selectedParks;
-      setRouteError(null);
+      setRouteStats(null);
       
       console.log('Calculating route between visitor centers:', {
         start: { name: start.name, location: start.location },
@@ -126,7 +79,7 @@ const Map = () => {
           setRoute(routeFeature.geometry.coordinates);
           const distanceMiles = (segments.distance * 0.000621371).toFixed(1);
           
-          setRouteInfo({
+          setRouteStats({
             distance: distanceMiles,
             elevationGain: elevationGainFeet || 'Not available',
             startPark: start.name,
@@ -136,13 +89,11 @@ const Map = () => {
         .catch(error => {
           console.error('Error calculating route:', error);
           setRoute(null);
-          setRouteInfo(null);
-          setRouteError(`Unable to find a cycling route between ${start.name} and ${end.name}. The parks might be too far apart or lack connecting roads.`);
+          setRouteStats(null);
         });
     } else {
       setRoute(null);
-      setRouteInfo(null);
-      setRouteError(null);
+      setRouteStats(null);
     }
   }, [selectedParks]);
 
@@ -200,7 +151,7 @@ const Map = () => {
             style={parkStyle}
           />
         )}
-        {sortedParks.map((park, i) => {
+        {selectedParks.map((park, i) => {
           const peakInfo = parkPeaks[park.name] || parkPeaks[park.name.replace(' National Park', '')];
           return (
             <Marker 
@@ -245,7 +196,7 @@ const Map = () => {
         )}
       </MapContainer>
       
-      {(routeInfo || routeError) && (
+      {routeStats && (
         <div style={{
           position: 'absolute',
           top: 10,
@@ -257,33 +208,24 @@ const Map = () => {
           zIndex: 1000,
           maxWidth: '300px'
         }}>
-          {routeInfo ? (
-            <>
-              <h3 style={{ margin: '0 0 0.5rem 0' }}>Route Information</h3>
-              <p style={{ margin: '0.25rem 0' }}><strong>From:</strong> {routeInfo.startPark}</p>
-              <p style={{ margin: '0.25rem 0' }}><strong>To:</strong> {routeInfo.endPark}</p>
-              <p style={{ margin: '0.25rem 0' }}><strong>Distance:</strong> {routeInfo.distance} miles</p>
-              <p style={{ margin: '0.25rem 0' }}>
-                <strong>Elevation Gain:</strong>{' '}
-                {typeof routeInfo.elevationGain === 'number' 
-                  ? `${routeInfo.elevationGain} ft`
-                  : routeInfo.elevationGain
-                }
-              </p>
-              <small style={{ display: 'block', marginTop: '0.5rem', color: '#666' }}>
-                Routes are calculated between visitor centers
-              </small>
-            </>
-          ) : (
-            <>
-              <h3 style={{ margin: '0 0 0.5rem 0', color: '#ff3b30' }}>Route Error</h3>
-              <p style={{ margin: '0.25rem 0' }}>{routeError}</p>
-            </>
-          )}
+          <h3 style={{ margin: '0 0 0.5rem 0' }}>Route Information</h3>
+          <p style={{ margin: '0.25rem 0' }}><strong>From:</strong> {routeStats.startPark}</p>
+          <p style={{ margin: '0.25rem 0' }}><strong>To:</strong> {routeStats.endPark}</p>
+          <p style={{ margin: '0.25rem 0' }}><strong>Distance:</strong> {routeStats.distance} miles</p>
+          <p style={{ margin: '0.25rem 0' }}>
+            <strong>Elevation Gain:</strong>{' '}
+            {typeof routeStats.elevationGain === 'number' 
+              ? `${routeStats.elevationGain} ft`
+              : routeStats.elevationGain
+            }
+          </p>
+          <small style={{ display: 'block', marginTop: '0.5rem', color: '#666' }}>
+            Routes are calculated between visitor centers
+          </small>
           <button 
             onClick={() => {
               setSelectedParks([]);
-              setRouteError(null);
+              setRouteStats(null);
             }} 
             style={{
               marginTop: '0.5rem',
