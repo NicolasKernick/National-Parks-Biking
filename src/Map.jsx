@@ -6,6 +6,7 @@ import * as turf from '@turf/turf';
 import Openrouteservice from 'openrouteservice-js';
 import { visitorCenters } from './visitorCenters';
 import { parkPeaks } from './peakData';
+import nationalParksData from './national_parks.geojson';
 
 const usCenter = [39.8283, -98.5795];
 const orsClient = new Openrouteservice.Directions({
@@ -26,65 +27,59 @@ const Map = () => {
   const [routeError, setRouteError] = useState(null);
 
   useEffect(() => {
-    fetch('https://cdn.jsdelivr.net/gh/NicolasKernick/National-Parks-Biking@main/public/national_parks.geojson')
-      .then((res) => res.json())
-      .then((data) => {
-        const nationalParks = {
-          ...data,
-          features: data.features.filter(feature => 
-            feature.properties.UNIT_TYPE === 'National Park'
-          )
-        };
-        setParkBoundaries(nationalParks);
+    const data = nationalParksData;
+    const nationalParks = {
+      ...data,
+      features: data.features.filter(feature => 
+        feature.properties.UNIT_TYPE === 'National Park'
+      )
+    };
+    setParkBoundaries(nationalParks);
 
-        // Log all park names from GeoJSON for debugging
-        console.log('Park names from GeoJSON:', nationalParks.features.map(f => ({
-          name: f.properties.PARKNAME,
-          type: f.properties.UNIT_TYPE,
-          hasVisitorCenter: !!visitorCenters[f.properties.PARKNAME] || !!visitorCenters[f.properties.PARKNAME + ' National Park']
-        })));
+    // Log all park names from GeoJSON for debugging
+    console.log('Park names from GeoJSON:', nationalParks.features.map(f => ({
+      name: f.properties.PARKNAME,
+      type: f.properties.UNIT_TYPE,
+      hasVisitorCenter: !!visitorCenters[f.properties.PARKNAME] || !!visitorCenters[f.properties.PARKNAME + ' National Park']
+    })));
 
-        // Create sorted parks array with visitor center coordinates
-        const parksWithLocations = nationalParks.features.map((feature, idx) => {
-          const parkName = feature.properties.PARKNAME;
-          let visitorCenter = visitorCenters[parkName];
-          let usedName = parkName;
-          if (!visitorCenter) {
-            visitorCenter = visitorCenters[parkName + ' National Park'];
-            usedName = parkName + ' National Park';
-          }
-          if (!visitorCenter) {
-            console.warn(`⚠️ No visitor center found for "${parkName}" or "${parkName} National Park". Available visitor centers:`, 
-              Object.keys(visitorCenters));
-          }
+    // Create sorted parks array with visitor center coordinates
+    const parksWithLocations = nationalParks.features.map((feature, idx) => {
+      const parkName = feature.properties.PARKNAME;
+      let visitorCenter = visitorCenters[parkName];
+      let usedName = parkName;
+      if (!visitorCenter) {
+        visitorCenter = visitorCenters[parkName + ' National Park'];
+        usedName = parkName + ' National Park';
+      }
+      if (!visitorCenter) {
+        console.warn(`⚠️ No visitor center found for "${parkName}" or "${parkName} National Park". Available visitor centers:`, 
+          Object.keys(visitorCenters));
+      }
 
-          // If no visitor center data, fall back to centroid
-          let location;
-          if (visitorCenter) {
-            location = visitorCenter;
-            console.log(`✓ Found visitor center for ${usedName}`);
-          } else {
-            const centroid = turf.centroid(feature).geometry.coordinates;
-            location = [centroid[1], centroid[0]];
-            console.warn(`Using centroid for ${parkName} at [${location}]`);
-          }
+      // If no visitor center data, fall back to centroid
+      let location;
+      if (visitorCenter) {
+        location = visitorCenter;
+        console.log(`✓ Found visitor center for ${usedName}`);
+      } else {
+        const centroid = turf.centroid(feature).geometry.coordinates;
+        location = [centroid[1], centroid[0]];
+        console.warn(`Using centroid for ${parkName} at [${location}]`);
+      }
 
-          return {
-            idx,
-            name: parkName,
-            location,
-            feature,
-            hasVisitorCenter: !!visitorCenter
-          };
-        });
-        
-        // Sort by latitude (north to south)
-        parksWithLocations.sort((a, b) => b.location[0] - a.location[0]);
-        setSortedParks(parksWithLocations);
-      })
-      .catch(error => {
-        console.error('Error loading GeoJSON:', error);
-      });
+      return {
+        idx,
+        name: parkName,
+        location,
+        feature,
+        hasVisitorCenter: !!visitorCenter
+      };
+    });
+    
+    // Sort by latitude (north to south)
+    parksWithLocations.sort((a, b) => b.location[0] - a.location[0]);
+    setSortedParks(parksWithLocations);
   }, []);
 
   useEffect(() => {
