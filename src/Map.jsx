@@ -26,7 +26,7 @@ const Map = () => {
   const [routeError, setRouteError] = useState(null);
 
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/NicolasKernick/National-Parks-Biking/main/public/national_parks.geojson')
+    fetch('https://cdn.jsdelivr.net/gh/NicolasKernick/National-Parks-Biking@main/public/national_parks.geojson')
       .then((res) => res.json())
       .then((data) => {
         const nationalParks = {
