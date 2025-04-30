@@ -3,15 +3,11 @@ import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Tooltip, Polyline } fr
 import 'leaflet/dist/leaflet.css';
 import { parks } from './parksData';
 import * as turf from '@turf/turf';
-import Openrouteservice from 'openrouteservice-js';
 import { visitorCenters } from './visitorCenters';
 import { parkPeaks } from './peakData';
 import L from 'leaflet';
 
 const usCenter = [39.8283, -98.5795];
-const orsClient = new Openrouteservice.Directions({
-  api_key: import.meta.env.VITE_ORS_API_KEY
-});
 
 // Helper function to format elevation
 const formatElevation = (feet) => {
@@ -54,10 +50,12 @@ const Map = () => {
         end: { name: end.name, location: end.location }
       });
 
-      orsClient
-        .calculate({
+      fetch('/api/ors-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           coordinates: [
-            [start.location[1], start.location[0]], // Convert to [lng, lat]
+            [start.location[1], start.location[0]],
             [end.location[1], end.location[0]]
           ],
           profile: 'cycling-regular',
@@ -65,6 +63,8 @@ const Map = () => {
           elevation: true,
           extra_info: ['steepness', 'surface', 'waytype']
         })
+      })
+        .then(res => res.json())
         .then(response => {
           if (!response.features || response.features.length === 0) {
             throw new Error('No route found between these parks');
