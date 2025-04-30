@@ -6,6 +6,17 @@ import * as turf from '@turf/turf';
 import { visitorCenters } from './visitorCenters';
 import { parkPeaks } from './peakData';
 import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Fix leaflet's default icon path so markers show up correctly
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 const usCenter = [39.8283, -98.5795];
 
